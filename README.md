@@ -1,3 +1,6 @@
+Goose Watch is a collaborative example of OpenText Thrust Services. 
+It provides the foundational elements to create a fully functional public reporting app for animal sightings and to ask for assistance for yourself or the animal. 
+
 # Goose Watch Web Application built with OpenText CMS, CSS, InfoIntel, and Messaging Services
 This application showcases four OpenText API Services - Content Metadata Service (CMS), Content Storage Service (CSS), Information Intelligence Service (InfoIntel) and Messaging Serice, running on the OpenText Cloud Platform (hosted on GCP), and the use of a Relational Database (mySQL) to store the form data.
 
