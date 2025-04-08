@@ -1,0 +1,15 @@
+{
+  "projectName": "goose-watch",
+  "projectType": "STANDALONE",
+  "application": {
+    "id": "599d0570-5fc5-4890-982c-d53cd6006984",
+    "name": "goose_watch_demo",
+    "displayName": "Goose Watch Demo",
+    "description": "The Goose watch is a multi-service application that is extensible in a variety of different ways",
+    "version": "1.0",
+    "vendor": "OT_Dev_Program"
+  },
+  "modelFolders": [
+    "./otresources"
+  ]
+}
