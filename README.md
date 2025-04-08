@@ -6,7 +6,7 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 ## This sample application demonstrates the following capabilities: 
  1. Using [Information Intelligence API](https://developer.opentext.com/services/products/information-intelligence) to assess level of risk posed by the uploaded image. 
  2. Using [Messaging Service](https://developer.opentext.com/services/products/messaging-service) to send an email notification when the user requests assistance.
- 3. Using [Content Storage Service](https://developer.opentext.com/services/products/content-storage-service) to storage the uploaded image in the Content Storage.
+ 3. Using [Content Storage Service](https://developer.opentext.com/services/products/content-storage-service) to store the uploaded image in the Content Storage.
  4. Using [Content Metadata Service](https://developer.opentext.com/services/products/content-metadata-service) to create the file metadata.
  5. Using [mySQL](https://dev.mysql.com/) to load form data into a relational database.
 
