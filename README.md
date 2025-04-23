@@ -30,7 +30,7 @@ db_scripts\create_table_goose_watch.sql
 ```
 
 ## Running the Application
-Before you run the application, update add the following information, based on your OCP (OpenText Cloud Platform) account, in the `properties.js` file located in the src sub-folder
+Before you run the application, add the following information, based on your OCP (OpenText Cloud Platform) account, in the `properties.js` file located in the src sub-folder
   ```
   tenant_id: 
   username: 
@@ -66,5 +66,7 @@ Running this command will also open the application frontend in your default web
 ## Interacting with the Application
 The Goose Watch web application contains a simple web form that captures information related to goose sightings. Application allows the user to also upload an image, which is scanned for risk assessment before being stored in the content storage. All the data is then stored in mySQL database. If the user requests for assistance, an email is sent to the email address stored in the properties file.
 
+When testing the application, you may experience a CORS error from the Messaging Service indicating that access from your localhost has been block by CORS policy. In such a case, you can install [Allow CORS: Access-Control-Allow-origin](https://mybrowseraddon.com/access-control-allow-origin.html) brower extension.
+
 ## Developer Support
-If you require support with this web application you can post your question on the [OpenText Developer Forum](https://forums.opentext.com/forums/developer/categories/ot2-development).
+If you require support with this web application, you can post your questions on the [OpenText Developer Forum](https://forums.opentext.com/forums/developer/categories/ot2-development).
