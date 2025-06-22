@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 //import { Link } from 'react-router-dom';
-import axios from 'axios';
+import api from './common/requestInterceptor';
 import {properties} from './properties';
+import { ClipLoader } from "react-spinners";
 
 function Form() {
-    const [accessToken, setAccessToken] = useState();
     const [inputs, setInputs] = useState({
       request_type: "form",
       sighting_datetime: "",
@@ -22,7 +22,9 @@ function Form() {
     const [showLocationTypeOther, setShowLocationTypeOther] = useState(false);
     const [showBehaviorObservedOther, setShowBehaviorObservedOther] = useState(false);
     const [file, setFile] = useState();                 //reference to file uploaded from the UI
-    const [folderId, setFolderId] = useState("");         //reference to folder metadata
+    const [folderId, setFolderId] = useState("");       //reference to folder metadata
+
+    const [bootstrapLoader, setBootstrapLoader] = useState(false);
   
     const isLoaded = useRef(false);
   
@@ -32,79 +34,113 @@ function Form() {
   
       isLoaded.current = true;
     }, []);
-  
+
     /**
-     * initialize() - Get Access token and create a folder (if not already created) for images uploaded through the form
+     * initialize() - Initialize the app related configurations
      */
     async function initialize() {
-      console.log('Initializing App instance');
-      //-- Get Access Token
-      const url = `${properties.base_url}/tenants/${properties.tenant_id}/oauth2/token`
-      const requestOptions = {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json' 
-          },
-          body: JSON.stringify({
-              client_id: properties.client_id,
-              client_secret: properties.client_secret,
-              grant_type: "password",
-              username: properties.username,
-              password: properties.password
-          })
+      console.log('Initializing the App configurations');
+
+      //Get the folder
+      let url = `/cms/instances/folder/cms_folder?filter=name%20eq%20%27${properties.cms_folder}%27`
+      const response = await api.get(url)
+      if(response.status === 200 && response.data._embedded == null){
+        bootstrap(); //Bootstrap the configurations if not avaiable
+      } else {
+        setFolderId(response.data._embedded.collection[0].id);
       }
+    }
   
-      const response = await fetch(url, requestOptions)
-      if (!response.ok) {
-        alert("Authentication Failed. Please verify your credentials in properties.js")
-        return
-      }
-      const data = await response.json()
-      const token = data.access_token;
-      setAccessToken(token)
-      //--
-  
-      //-- Get folder Id to store images in Content Storage by calling Content Metadata Service
-      const url1 = `${properties.base_url}/cms/instances/folder/cms_folder?include-total=true&filter=name%20eq%20%27${properties.cms_folder}%27`
-      const fetchOptions1 = {
-        method: "GET",
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': "application/hal+json"
-        }
-      }
-  
-      const response1 = await fetch(url1, fetchOptions1);
-      const data1     = await response1.json();
-      if (data1.total > 0) {
-        let folder = data1._embedded.collection[0].id;
-        setFolderId(folder);
-      }
-      else { 
-        //Did not find the folder in CMS, create a new one using Content Metadata Service
-        const url2 = `${properties.base_url}/cms/instances/folder/cms_folder`
-        const fetchOptions2 = {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json', 
-              'accept': 'application/hal+json'
+    /**
+     * bootstrap() - Bootstrap the Content Metadata Service configurations
+     */
+    async function bootstrap() {
+      setBootstrapLoader(true)
+
+      try {
+
+        console.log('Bootstrapping the CMS configurations')
+
+        // Create a custom file type definition with appropriate attributes
+        let requestBody = {
+          "name": properties.cms_type,
+          "display_name": properties.cms_type,
+          "description": "Custom type for goose watch",
+          "attributes":[
+            {
+              "name":"sighting_datetime",
+              "data_type":"string"
             },
-            body: JSON.stringify({
-              "name": properties.cms_folder,
-              "display_name": properties.cms_folder,
-              "description": "Folder to store Goose Watch images",
-              "type": "cms_folder"
-            })
+            {
+              "name":"location",
+              "data_type":"string"
+            },
+            {
+              "name":"location_type",
+              "data_type":"string"
+            },
+            {
+              "name":"location_type_other",
+              "data_type":"string"
+            },
+            {
+              "name":"num_of_geese",
+              "data_type":"string"
+            },
+            {
+              "name":"behavior_observed",
+              "data_type":"string"
+            },
+            {
+              "name":"behavior_observed_other",
+              "data_type":"string"
+            },
+            {
+              "name":"person_name",
+              "data_type":"string"
+            },
+            {
+              "name":"person_email",
+              "data_type":"string"
+            },
+            {
+              "name":"person_phone",
+              "data_type":"string"
+            },
+            {
+              "name":"assist_required",
+              "data_type":"string"
+            },
+            {
+              "name":"status",
+              "data_type":"string"
+            }
+          ]
         }
+      
+        let response = await api.post('/cms/type-definitions/file', requestBody)
+        let data     = response.data
+        console.log('CMS type created : ', data.name)
+
     
-        const response2 = await fetch(url2, fetchOptions2);
-        const data2     = await response2.json();
-        let folder = data2.id;
-        setFolderId(data2.id);
-        console.log('CMS Folder Created: ', folder)
+        // Create a custom folder that acts a placeholder for all our instances
+        requestBody = {
+          "name": properties.cms_folder,
+          "display_name": properties.cms_folder,
+          "description": "Folder to store Goose watch instances",
+          "type": "cms_folder"
+        }
+      
+        response = await api.post('/cms/instances/folder/cms_folder', requestBody)
+        data     = response.data;
+        let folder = data.id;
+        setFolderId(folder);
+        console.log('CMS folder created : ', folder)
       }
-      //--
+      finally {
+        setBootstrapLoader(false)
+      }
+      
     }
   
     /**
@@ -119,22 +155,17 @@ function Form() {
      * uploadFileToCSS() - Upload File to Content Storage by calling Content Storage Service
      */
     async function uploadFileToCSS() {
-      const cssUrl =`${properties.css_url}/v2/tenant/${properties.tenant_id}/content`
-      const cssFetchOptions = {
-        method: "POST",
+      const cssUrl = `${properties.css_url}/v2/tenant/${properties.tenant_id}/content`
+      const formData = new FormData();
+      formData.append("file", file);
+ 
+      const response = await api.post(cssUrl, formData, {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': "application/hal+json",
-          'Content-Type': file.type,
-          'Content-Length': file.size 
-        },
-        body: file
-      }
-  
-      
-      const response = await fetch(cssUrl, cssFetchOptions);
-      const data     = await response.json();
-      const cssFile  = await data.entries[0];
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      const cssFile  = await response.data.entries[0];
   
       return cssFile;
     }
@@ -151,38 +182,77 @@ function Form() {
     }
   
     /**
-     * createMetadataForFile() - Create metadata for the image file by calling Content Metadata Service
+     * createMetadatAlongWithImage() - Create metadata and attach the uploaded image to it
      */
-    async function createMetadataForFile(uploadedFile) {
+    async function createMetadatAlongWithImage(uploadedFile) {
   
-      const newFileName = createUniqueFileName(file.name);
+      const name = createUniqueFileName(file.name);
+      const typeSystemName = `def_${properties.cms_type}`;
   
-      //Now create metadata   
-      const url = `${properties.base_url}/cms/instances/file/cms_file`
-      const fetchOptions = {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/hal+json',
-          'Content-Type': 'application/hal+json' 
+      //Create the corresponding metadata in CMS  
+      const url = `/cms/instances/file/${typeSystemName}?delete-source-file=true` 
+      const requestBody = {
+        "name": name,
+        "description": "Goose watch instance with image",
+        "parent_folder_id": folderId,
+        "properties":{
+          "sighting_datetime": `${inputs.sighting_datetime}`,
+          "location": `${inputs.location}`,
+          "location_type": `${inputs.location_type}`,
+          "location_type_other": `${inputs.location_type_other}`,
+          "num_of_geese": `${inputs.num_of_geese}`,
+          "behavior_observed": `${inputs.behavior_observed}`,
+          "behavior_observed_other": `${inputs.behavior_observed_other}`,
+          "person_name": `${inputs.person_name}`,
+          "person_email": `${inputs.person_email}`,
+          "person_phone": `${inputs.person_phone}`,
+          "assist_required": `${inputs.assist_required}`,
+          "status":"OPEN"
         },
-        body: JSON.stringify({
-          "name": newFileName,
-          "description": "Image uploaded for Goose Watch",
-          "parent_folder_id": folderId,
-          "renditions": [{
-              "name": newFileName,
-              "rendition_type": "primary",
-              "blob_id": uploadedFile.id,
-              "mime_type": uploadedFile.mimeType
-            }]
-        })
+        "renditions": [{
+            "name": name,
+            "rendition_type": "primary",
+            "blob_id": uploadedFile.id,
+            "mime_type": uploadedFile.mimeType
+        }]
       }
   
-      const response = await fetch(url, fetchOptions);
-      const data     = await response.json();
+      const response = await api.post(url, requestBody);
+      return response.data;
+    }
+
+    /**
+     * createMetadatWithoutImage() - Create metadata without image
+     */
+    async function createMetadatWithoutImage() {
+
+      const name = new Date().toISOString();
+      const typeSystemName = `def_${properties.cms_type}`;
+
+      //Create the corresponding metadata in CMS  
+      const url = `/cms/instances/file/${typeSystemName}?delete-source-file=true` 
+      const requestBody = {
+        "name": name,
+        "description": "Goose watch instance without image",
+        "parent_folder_id": folderId,
+        "properties":{
+          "sighting_datetime": `${inputs.sighting_datetime}`,
+          "location": `${inputs.location}`,
+          "location_type": `${inputs.location_type}`,
+          "location_type_other": `${inputs.location_type_other}`,
+          "num_of_geese": `${inputs.num_of_geese}`,
+          "behavior_observed": `${inputs.behavior_observed}`,
+          "behavior_observed_other": `${inputs.behavior_observed_other}`,
+          "person_name": `${inputs.person_name}`,
+          "person_email": `${inputs.person_email}`,
+          "person_phone": `${inputs.person_phone}`,
+          "assist_required": `${inputs.assist_required}`,
+          "status":"OPEN"
+        }
+      }
   
-      return data;
+      const response = await api.post(url, requestBody);
+      return response.data;
     }
   
     /**
@@ -207,7 +277,6 @@ function Form() {
         const fetchOptions = {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${accessToken}`,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
@@ -244,24 +313,6 @@ function Form() {
             console.error("Error sending email for assistance: ", error);
         })
     }
-
-    /**
-     * sendToDBServer() - Insert record into database by calling the Server-side React App
-     */
-    function sendToDBServer(dbInputs) {
-      //console.log('sendToDBServer - dbInputs: ', dbInputs);
-      const url = properties.server_url
-      axios.post(url, dbInputs)
-      .then(res => {
-        console.log('sendToDBServer - response: ', res);
-        alert('Information submitted successfully');
-        resetForm();
-        })
-      .catch(error => {
-        console.log('sendToDBServer - error: ', error.message);
-        alert('Error: Unable to add data into database')
-      })
-    }
     
     /**
      * analyzeImageWithInfoIntel() - Determine risk level of uploaded image using Information Intelligence API. 
@@ -271,18 +322,16 @@ function Form() {
       let formData = new FormData();
       formData.append('File', file, file.name);
   
+      const url = `${properties.infointel_url}/api/v1/classify`
       let options = {
-        url: `${properties.infointel_url}/api/v1/classify`,
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${accessToken}`, 
+        headers: {
           'Accept': "application/json",
           'Content-Type': "multipart/form-data"
         },
         data: formData
       }
   
-      const response = await axios(options);
+      const response = await api.post(url, options);
       const data = response.data;
       const riskLevel = data.riskClassification.result.image[0].riskLevel
       console.log('InfoIntel - riskLevel: ', riskLevel);
@@ -353,22 +402,18 @@ function Form() {
         alert('For assistance please provide your name, email and phone number');
         return;
       }
-
-      //If user requires assistance send email using Messaging Service...
-      if (inputs.assist_required === "Y")
-        sendMessageForAssistance();
   
-      //If user selected an image file to upload...
+      //If user selected an image file to upload.
       if (file) {
-        //TODO: Check if auth token has expired. When token is expired, you get 401 (Unauthorized) status with faultstring:"Access Token expired"
-  
         //Analyze image with Information Intelligence API
-        let riskLevel = await analyzeImageWithInfoIntel();
-        if (riskLevel !== 'noRisk') {
-          console.log('handleSubmit - analyzeImageWithInfoIntel: ', riskLevel);
-          alert('Error: Uploaded image has a '+riskLevel+' risk score and is not allowed.');
-          return;
-        }
+
+        //TODO : Need to check if the below commented code works with the latest changes
+        // let riskLevel = await analyzeImageWithInfoIntel();
+        // if (riskLevel !== 'noRisk') {
+        //   console.log('handleSubmit - analyzeImageWithInfoIntel: ', riskLevel);
+        //   alert('Error: Uploaded image has a '+riskLevel+' risk score and is not allowed.');
+        //   return;
+        // }
     
         //Upload image file to Content Storage
         let cssUploadedFile = await uploadFileToCSS();
@@ -380,16 +425,20 @@ function Form() {
         }
   
         //Create image file metadata
-        let fileMetadata = await createMetadataForFile(cssUploadedFile);
+        let fileMetadata = await createMetadatAlongWithImage(cssUploadedFile);
         console.log('handleSubmit - fileMetadata: ', fileMetadata);
-  
-        //Add image file metadata id to the input list to add to the database record
-        const dbInputs = {...inputs, "file_metadata": fileMetadata.id};
-        sendToDBServer(dbInputs);
+      } else {
+        let fileMetadata = await createMetadatWithoutImage();
+        console.log('handleSubmit - fileMetadata: ', fileMetadata);
       }
-      else {
-        sendToDBServer(inputs);
-      }
+
+      //If user requires assistance send email using Messaging Service
+
+      //TODO : Need to check if the below commented code works with the latest changes
+      // if (inputs.assist_required === "Y")
+      //   sendMessageForAssistance();
+
+      resetForm();
     }
   
     /***********************
@@ -400,6 +449,14 @@ function Form() {
         <img src="goose-watch-logo.jpg" alt="Flowers in Chania" width="500" height="224"></img>
         <br/><br />
         <div className="ot2-body">
+          {bootstrapLoader && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '20px' }}>
+              <ClipLoader color="#4fa94d" size={50} />
+              <p style={{ marginTop: '10px', fontSize: '14px', color: '#333' }}>
+                Setting up thing for you...
+              </p>
+            </div>
+          )}
         <form method="post" id="goosewatchform" onSubmit={handleSubmit}>
           <label className="requiredlabel" htmlFor="sighting_datetime">Date/Time of Sighting:</label>
           <input type="datetime-local" id="sighting_datetime" name="sighting_datetime" onChange={handleChange} value={inputs.sighting_datetime} required />
